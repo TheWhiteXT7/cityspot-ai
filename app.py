@@ -8,7 +8,7 @@ import requests
 import datetime
 import altair as alt 
 
-# --- 1. PAGE CONFIGURATION ---
+# PAGE CONFIGURATION 
 st.set_page_config(
     page_title="CitySpot AI",
     page_icon="🅿️",
@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. CUSTOM CSS ---
+# CUSTOM CSS
 st.markdown("""
 <style>
     #MainMenu {visibility: hidden;}
@@ -37,7 +37,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. SIDEBAR ---
+# SIDEBAR
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3063/3063822.png", width=80)
 st.sidebar.title("CitySpot AI")
 st.sidebar.success("System Status: **Online** 🟢")
@@ -56,7 +56,7 @@ st.sidebar.success("Algorithm: **Random Forest** 🌲")
 st.sidebar.info("Accuracy: **94.2%**")
 st.sidebar.caption("Data: **OpenStreetMap API**")
 
-# --- 4. BACKEND LOGIC ---
+# BACKEND LOGIC
 
 def get_location_suggestions(search_term):
     if not search_term: return []
@@ -98,7 +98,7 @@ def get_forecast_data(base_occupancy):
     trend = [min(100, max(0, t + np.random.randint(-5, 5))) for t in trend]
     return pd.DataFrame({'Time': hours, 'Occupancy (%)': trend})
 
-# --- SPLIT BOXES FOR ML STATS ---
+# SPLIT BOXES FOR ML STATS
 def show_ml_stats(occupancy_rate):
     # BOX 1: MODEL INFERENCE
     with st.container(border=True):
@@ -113,7 +113,7 @@ def show_ml_stats(occupancy_rate):
         st.altair_chart(chart, use_container_width=True)
         st.caption("ℹ️ **Feature Weights:** Time (0.4), Density (0.3)")
 
-    # BOX 2: FUTURE FORECAST
+    # FUTURE FORECAST
     with st.container(border=True):
         st.markdown("#### 📉 Future Forecast")
         forecast_df = get_forecast_data(occupancy_rate)
@@ -122,7 +122,7 @@ def show_ml_stats(occupancy_rate):
         ).properties(height=150)
         st.altair_chart(line_chart, use_container_width=True)
 
-# --- 5. LIVE DASHBOARD COMPONENT ---
+# LIVE DASHBOARD COMPONENT
 @st.fragment(run_every=3) 
 def show_live_dashboard(lat, lon, address, base_rate, est_cost, time_hour):
     
@@ -170,7 +170,7 @@ def show_live_dashboard(lat, lon, address, base_rate, est_cost, time_hour):
             
     return live_rate
 
-# --- 6. MAIN APP LAYOUT ---
+# MAIN APP LAYOUT
 st.title("🅿️ CitySpot: Smart Mobility Assistant")
 st.markdown("##### 🚀 AI-Powered Availability & Context Forecasting")
 st.write("---")
@@ -234,7 +234,6 @@ if selected_address:
                 # ML STATS (Split Boxes)
                 show_ml_stats(base_occupancy)
             
-            # --- RESTORED: BOTTOM DATA SECTION ---
             st.write("---")
             with st.expander("📊 View Training Data & System Logs (Admin Access)"):
                 st.markdown("### 🗄️ Historical Training Data")
@@ -249,4 +248,5 @@ if selected_address:
                 st.info("ℹ️ This data is used to retrain the Random Forest model every 24 hours.")
 
     except Exception as e:
+
         st.error(f"System Error: {e}")
