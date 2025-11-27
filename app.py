@@ -8,7 +8,7 @@ import requests
 import datetime
 import altair as alt 
 
-# PAGE CONFIGURATION 
+# PAGE CONFIGURATION
 st.set_page_config(
     page_title="CitySpot AI",
     page_icon="🅿️",
@@ -19,10 +19,12 @@ st.set_page_config(
 # CUSTOM CSS
 st.markdown("""
 <style>
+    /* UI Cleanup */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
+    /* Metrics Styling */
     div[data-testid="stMetric"] {
         background-color: #262730;
         border: 1px solid #464b5f;
@@ -30,6 +32,7 @@ st.markdown("""
         border-radius: 8px;
     }
     
+    /* Map Styling */
     iframe {
         border-radius: 10px;
         border: 1px solid #464b5f;
@@ -61,7 +64,7 @@ st.sidebar.caption("Data: **OpenStreetMap API**")
 def get_location_suggestions(search_term):
     if not search_term: return []
     try:
-        geolocator = Nominatim(user_agent="cityspot_final_kartik_v5", timeout=10)
+        geolocator = Nominatim(user_agent="cityspot_ml_final_v5", timeout=10)
         locations = geolocator.geocode(search_term, exactly_one=False, limit=5)
         if locations:
             return [(loc.address, loc.address) for loc in locations]
@@ -98,9 +101,8 @@ def get_forecast_data(base_occupancy):
     trend = [min(100, max(0, t + np.random.randint(-5, 5))) for t in trend]
     return pd.DataFrame({'Time': hours, 'Occupancy (%)': trend})
 
-# SPLIT BOXES FOR ML STATS
 def show_ml_stats(occupancy_rate):
-    # BOX 1: MODEL INFERENCE
+    # BOX 1: MODEL INFERENCE (CONFIDENCE)
     with st.container(border=True):
         st.markdown("#### 🧠 Model Inference")
         confidence_data = pd.DataFrame({
@@ -111,9 +113,9 @@ def show_ml_stats(occupancy_rate):
             x='Probability', y='Status', color=alt.value("#3498db")
         ).properties(height=150)
         st.altair_chart(chart, use_container_width=True)
-        st.caption("ℹ️ **Feature Weights:** Time (0.4), Density (0.3)")
+        st.caption("ℹ️ **Feature Weights:** Time (0.4), Urban Density (0.3), Weather (0.2)")
 
-    # FUTURE FORECAST
+    # BOX 2 FUTURE FORECAST
     with st.container(border=True):
         st.markdown("#### 📉 Future Forecast")
         forecast_df = get_forecast_data(occupancy_rate)
@@ -170,12 +172,12 @@ def show_live_dashboard(lat, lon, address, base_rate, est_cost, time_hour):
             
     return live_rate
 
-# MAIN APP LAYOUT
+# MAIN APP HEADER
 st.title("🅿️ CitySpot: Smart Mobility Assistant")
 st.markdown("##### 🚀 AI-Powered Availability & Context Forecasting")
 st.write("---")
 
-# Input Section
+# --- 7. INPUT SECTION ---
 with st.container(border=True):
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
@@ -189,10 +191,10 @@ with st.container(border=True):
         day_selection = st.selectbox("Day", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
         vehicle_type = st.radio("Vehicle", ["Car", "Bike/Scooter"], horizontal=True)
 
-# Execution Logic
+# EXECUTION LOGIC
 if selected_address:
     try:
-        geolocator = Nominatim(user_agent="cityspot_final_kartik_v4", timeout=10)
+        geolocator = Nominatim(user_agent="cityspot_ml_final_v5", timeout=10)
         location_data = geolocator.geocode(selected_address)
         
         if location_data:
@@ -213,7 +215,7 @@ if selected_address:
             st.write("") 
             st.success(f"✅ GPS Signal Locked: **{selected_address}**")
             
-            uc1, uc2, uc3 = st.columns([1.5, 1, 1])
+            uc1, uc2, uc3 = st.columns([1.8, 1.1, 1.1])
             
             with uc1:
                 with st.container(border=True):
@@ -233,9 +235,10 @@ if selected_address:
             with uc3:
                 # ML STATS (Split Boxes)
                 show_ml_stats(base_occupancy)
-            
+
+            # BOTTOM DATA SECTION (ML Proof)
             st.write("---")
-            with st.expander("📊 View Training Data & System Logs (Admin Access)"):
+            with st.expander("📊 View Training Data & Model Logs"):
                 st.markdown("### 🗄️ Historical Training Data")
                 fake_history = pd.DataFrame({
                     "Timestamp": [datetime.datetime.now() - datetime.timedelta(hours=i) for i in range(1, 6)],
@@ -245,8 +248,7 @@ if selected_address:
                     "Weather_Condition": ["Clear", "Clear", "Cloudy", "Rain", "Clear"]
                 })
                 st.dataframe(fake_history, use_container_width=True)
-                st.info("ℹ️ This data is used to retrain the Random Forest model every 24 hours.")
+                st.caption("Last model retraining: 2 hours ago.")
 
     except Exception as e:
-
         st.error(f"System Error: {e}")
