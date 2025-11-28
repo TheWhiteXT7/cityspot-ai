@@ -8,7 +8,7 @@ import requests
 import datetime
 import altair as alt 
 
-# PAGE CONFIGURATION
+# --- 1. PAGE CONFIGURATION ---
 st.set_page_config(
     page_title="CitySpot AI",
     page_icon="🅿️",
@@ -16,15 +16,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CUSTOM CSS
+# --- 2. CUSTOM CSS ---
 st.markdown("""
 <style>
-    /* UI Cleanup */
+    /* UI Styling */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* Metrics Styling */
     div[data-testid="stMetric"] {
         background-color: #262730;
         border: 1px solid #464b5f;
@@ -32,7 +31,6 @@ st.markdown("""
         border-radius: 8px;
     }
     
-    /* Map Styling */
     iframe {
         border-radius: 10px;
         border: 1px solid #464b5f;
@@ -40,7 +38,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# SIDEBAR
+# --- 3. SIDEBAR ---
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3063/3063822.png", width=80)
 st.sidebar.title("CitySpot AI")
 st.sidebar.success("System Status: **Online** 🟢")
@@ -59,7 +57,7 @@ st.sidebar.success("Algorithm: **Random Forest** 🌲")
 st.sidebar.info("Accuracy: **94.2%**")
 st.sidebar.caption("Data: **OpenStreetMap API**")
 
-# BACKEND LOGIC
+# --- 4. BACKEND LOGIC ---
 
 def get_location_suggestions(search_term):
     if not search_term: return []
@@ -101,8 +99,36 @@ def get_forecast_data(base_occupancy):
     trend = [min(100, max(0, t + np.random.randint(-5, 5))) for t in trend]
     return pd.DataFrame({'Time': hours, 'Occupancy (%)': trend})
 
+def rank_best_alternative(base_occupancy, location_seed):
+    np.random.seed(location_seed)
+    best_safety = -1
+    best_spot_id = None
+    spot_data = []
+
+    for i in range(1, 5):
+        safety_score = np.random.randint(75, 99)
+        availability_chance = 1.0 - (base_occupancy / 100)
+        status = "Available" if np.random.random() < availability_chance else "Full"
+
+        spot_id = f"Spot {i}"
+        
+        spot_data.append({
+            "Spot ID": spot_id,
+            "Status": status,
+            "Distance": f"{np.random.randint(50, 300)} meters",
+            "Safety Score": f"{safety_score}/100",
+        })
+
+        if status == "Available" and safety_score > best_safety:
+            best_safety = safety_score
+            best_spot_id = spot_id
+            
+    if best_spot_id:
+        return f"🟢 PROCEED: {best_spot_id} (Safety: {best_safety}/100)", pd.DataFrame(spot_data)
+    else:
+        return "🔴 ALL SPOTS FULL", pd.DataFrame(spot_data)
+
 def show_ml_stats(occupancy_rate):
-    # BOX 1: MODEL INFERENCE (CONFIDENCE)
     with st.container(border=True):
         st.markdown("#### 🧠 Model Inference")
         confidence_data = pd.DataFrame({
@@ -115,7 +141,6 @@ def show_ml_stats(occupancy_rate):
         st.altair_chart(chart, use_container_width=True)
         st.caption("ℹ️ **Feature Weights:** Time (0.4), Urban Density (0.3), Weather (0.2)")
 
-    # BOX 2 FUTURE FORECAST
     with st.container(border=True):
         st.markdown("#### 📉 Future Forecast")
         forecast_df = get_forecast_data(occupancy_rate)
@@ -124,7 +149,7 @@ def show_ml_stats(occupancy_rate):
         ).properties(height=150)
         st.altair_chart(line_chart, use_container_width=True)
 
-# LIVE DASHBOARD COMPONENT
+# --- 5. LIVE DASHBOARD COMPONENT ---
 @st.fragment(run_every=3) 
 def show_live_dashboard(lat, lon, address, base_rate, est_cost, time_hour):
     
@@ -172,12 +197,12 @@ def show_live_dashboard(lat, lon, address, base_rate, est_cost, time_hour):
             
     return live_rate
 
-# MAIN APP HEADER
+# --- 6. MAIN APP LAYOUT ---
 st.title("🅿️ CitySpot: Smart Mobility Assistant")
 st.markdown("##### 🚀 AI-Powered Availability & Context Forecasting")
 st.write("---")
 
-# --- 7. INPUT SECTION ---
+# Input Section
 with st.container(border=True):
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
@@ -191,13 +216,14 @@ with st.container(border=True):
         day_selection = st.selectbox("Day", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
         vehicle_type = st.radio("Vehicle", ["Car", "Bike/Scooter"], horizontal=True)
 
-# EXECUTION LOGIC
+# Execution Logic
 if selected_address:
     try:
         geolocator = Nominatim(user_agent="cityspot_ml_final_v5", timeout=10)
         location_data = geolocator.geocode(selected_address)
         
         if location_data:
+            # STATIC CALCULATIONS
             base_price = 40
             expensive_cities = ["Delhi", "Mumbai", "Bangalore", "Gurgaon", "Noida"]
             if any(city in str(selected_address) for city in expensive_cities): base_price = 80
@@ -205,16 +231,20 @@ if selected_address:
             est_cost = base_price * duration
             
             day_idx = {"Monday":0, "Tuesday":1, "Wednesday":2, "Thursday":3, "Friday":4, "Saturday":5, "Sunday":6}[day_selection]
-            seed_val = sum([ord(char) for char in selected_address]) 
-            np.random.seed(seed_val + arrival_time + day_idx)
+            location_seed = sum([ord(char) for char in selected_address]) 
+            np.random.seed(location_seed + arrival_time + day_idx)
             
             base_occupancy = np.random.randint(20, 45) 
             if 17 <= arrival_time <= 21: base_occupancy += 35
             if "Mall" in selected_address: base_occupancy += 10
+
+            # RUN RANKING LOGIC
+            recommendation, spot_df = rank_best_alternative(base_occupancy, location_seed)
             
             st.write("") 
             st.success(f"✅ GPS Signal Locked: **{selected_address}**")
             
+            # --- MAIN LAYOUT ---
             uc1, uc2, uc3 = st.columns([1.8, 1.1, 1.1])
             
             with uc1:
@@ -224,6 +254,7 @@ if selected_address:
                     st.map(map_data, latitude="lat", longitude="lon", size="size", color="color", zoom=14)
                     st.caption("🔴 Target Destination | 🔵 Nearby Alternatives")
             with uc2:
+                # LIVE DATA FEED
                 current_rate = show_live_dashboard(
                     location_data.latitude, 
                     location_data.longitude, 
@@ -233,10 +264,10 @@ if selected_address:
                     arrival_time
                 )
             with uc3:
-                # ML STATS (Split Boxes)
+                # ML STATS
                 show_ml_stats(base_occupancy)
 
-            # BOTTOM DATA SECTION (ML Proof)
+            # --- BOTTOM DATA SECTION ---
             st.write("---")
             with st.expander("📊 View Training Data & Model Logs"):
                 st.markdown("### 🗄️ Historical Training Data")
@@ -249,6 +280,10 @@ if selected_address:
                 })
                 st.dataframe(fake_history, use_container_width=True)
                 st.caption("Last model retraining: 2 hours ago.")
+                
+                st.write("---")
+                st.markdown(f"#### 🎯 Final Navigation Target: **{recommendation}**") # FINAL VERDICT HERE
+                st.dataframe(spot_df, use_container_width=True, hide_index=True) # INSPECTOR TABLE
 
     except Exception as e:
         st.error(f"System Error: {e}")
