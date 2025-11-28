@@ -62,7 +62,7 @@ st.sidebar.caption("Data: **OpenStreetMap API**")
 def get_location_suggestions(search_term):
     if not search_term: return []
     try:
-        geolocator = Nominatim(user_agent="cityspot_ml_final_v5", timeout=10)
+        geolocator = Nominatim(user_agent="cityspot_final_kartik_v6", timeout=10)
         locations = geolocator.geocode(search_term, exactly_one=False, limit=5)
         if locations:
             return [(loc.address, loc.address) for loc in locations]
@@ -99,8 +99,11 @@ def get_forecast_data(base_occupancy):
     trend = [min(100, max(0, t + np.random.randint(-5, 5))) for t in trend]
     return pd.DataFrame({'Time': hours, 'Occupancy (%)': trend})
 
-def rank_best_alternative(base_occupancy, location_seed):
-    np.random.seed(location_seed)
+# --- FIXED LOGIC: NOW INCLUDES TIME/DAY DEPENDENCY ---
+def rank_best_alternative(base_occupancy, location_seed, time_hour, day_index):
+    # CRUCIAL FIX: Seed now changes with TIME/DAY
+    np.random.seed(location_seed + time_hour + day_index) 
+    
     best_safety = -1
     best_spot_id = None
     spot_data = []
@@ -108,6 +111,10 @@ def rank_best_alternative(base_occupancy, location_seed):
     for i in range(1, 5):
         safety_score = np.random.randint(75, 99)
         availability_chance = 1.0 - (base_occupancy / 100)
+        
+        # Add a slight safety bonus if it's day time (less risk)
+        if time_hour > 7 and time_hour < 20: safety_score = min(99, safety_score + 5)
+        
         status = "Available" if np.random.random() < availability_chance else "Full"
 
         spot_id = f"Spot {i}"
@@ -130,7 +137,7 @@ def rank_best_alternative(base_occupancy, location_seed):
 
 def show_ml_stats(occupancy_rate):
     with st.container(border=True):
-        st.markdown("#### 🧠 Model Inference")
+        st.markdown("#### 🧠 Prediction Confidence")
         confidence_data = pd.DataFrame({
             'Status': ['High Chance', 'Medium Chance', 'Low Chance'],
             'Probability': [0.85, 0.10, 0.05] if occupancy_rate < 50 else [0.10, 0.30, 0.60]
@@ -214,7 +221,7 @@ with st.container(border=True):
         duration = st.slider("Duration (Hrs)", 1, 12, 2)
     with col3:
         day_selection = st.selectbox("Day", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
-        vehicle_type = st.radio("Vehicle", ["Car", "Bike/Scooter"], horizontal=True)
+        vehicle_type = st.radio("Car", ["Car", "Bike/Scooter"], horizontal=True)
 
 # Execution Logic
 if selected_address:
@@ -232,15 +239,17 @@ if selected_address:
             
             day_idx = {"Monday":0, "Tuesday":1, "Wednesday":2, "Thursday":3, "Friday":4, "Saturday":5, "Sunday":6}[day_selection]
             location_seed = sum([ord(char) for char in selected_address]) 
-            np.random.seed(location_seed + arrival_time + day_idx)
+            
+            # --- RUN TIME-DEPENDENT LOGIC ---
+            np.random.seed(location_seed + arrival_time + day_idx) # Seed must change with sliders
             
             base_occupancy = np.random.randint(20, 45) 
             if 17 <= arrival_time <= 21: base_occupancy += 35
             if "Mall" in selected_address: base_occupancy += 10
 
-            # RUN RANKING LOGIC
-            recommendation, spot_df = rank_best_alternative(base_occupancy, location_seed)
-            
+            # RUN RANKING LOGIC (Using the new time-dependent seed)
+            recommendation, spot_df = rank_best_alternative(base_occupancy, location_seed, arrival_time, day_idx)
+
             st.write("") 
             st.success(f"✅ GPS Signal Locked: **{selected_address}**")
             
@@ -254,7 +263,6 @@ if selected_address:
                     st.map(map_data, latitude="lat", longitude="lon", size="size", color="color", zoom=14)
                     st.caption("🔴 Target Destination | 🔵 Nearby Alternatives")
             with uc2:
-                # LIVE DATA FEED
                 current_rate = show_live_dashboard(
                     location_data.latitude, 
                     location_data.longitude, 
@@ -264,7 +272,6 @@ if selected_address:
                     arrival_time
                 )
             with uc3:
-                # ML STATS
                 show_ml_stats(base_occupancy)
 
             # --- BOTTOM DATA SECTION ---
@@ -281,9 +288,10 @@ if selected_address:
                 st.dataframe(fake_history, use_container_width=True)
                 st.caption("Last model retraining: 2 hours ago.")
                 
+                # INSPECTOR TABLE
                 st.write("---")
-                st.markdown(f"#### 🎯 Final Navigation Target: **{recommendation}**") # FINAL VERDICT HERE
-                st.dataframe(spot_df, use_container_width=True, hide_index=True) # INSPECTOR TABLE
+                st.markdown(f"#### 🎯 Final Navigation Target: **{recommendation}**") 
+                st.dataframe(spot_df, use_container_width=True, hide_index=True)
 
     except Exception as e:
         st.error(f"System Error: {e}")
